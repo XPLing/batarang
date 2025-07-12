@@ -25,11 +25,13 @@
   "scripts": {
     "test": "karma start --single-run",
     "test:watch": "karma start",
-    "build": "gulp"
+    "build": "gulp",
+    "package": "gulp package",
+    "zip": "gulp zip"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/angular/angularjs-batarang.git"
+    "url": "https://github.com/XPLing/batarang.git"
   },
   "keywords": [
     "angular",

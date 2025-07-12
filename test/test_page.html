@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html ng-app="testApp">
+<head>
+    <title>AngularJS Batarang Test Page</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular.min.js"></script>
+</head>
+<body ng-controller="TestController">
+    <h1>AngularJS Batarang MV3 Test Page</h1>
+    
+    <div>
+        <h2>Test Data</h2>
+        <p>Name: {{name}}</p>
+        <p>Count: {{count}}</p>
+        <button ng-click="increment()">Increment</button>
+        <input ng-model="name" placeholder="Enter your name">
+    </div>
+
+    <div ng-controller="ChildController">
+        <h3>Child Scope</h3>
+        <p>Child Data: {{childData}}</p>
+        <button ng-click="updateChild()">Update Child</button>
+    </div>
+
+    <script>
+        // Set the debug cookie to enable Batarang
+        document.cookie = '__ngDebug=true; path=/';
+        
+        angular.module('testApp', [])
+            .controller('TestController', ['$scope', function($scope) {
+                $scope.name = 'Angular Developer';
+                $scope.count = 0;
+                
+                $scope.increment = function() {
+                    $scope.count++;
+                };
+            }])
+            .controller('ChildController', ['$scope', function($scope) {
+                $scope.childData = 'Child scope data';
+                
+                $scope.updateChild = function() {
+                    $scope.childData = 'Updated at ' + new Date().toLocaleTimeString();
+                };
+            }]);
+    </script>
+</body>
+</html>

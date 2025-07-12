@@ -7,3 +7,9 @@ bower_components
 node_modules
 coverage/
 package/
+.history/
+.vscode/
+*.zip
+CLAUDE.md
+.claude/
+ignore_doc/

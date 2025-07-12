@@ -1,16 +1,35 @@
 
-// tabId -> devtool port
-var inspectedTabs = {};
+// Storage helper functions for MV3 Service Worker
+async function getInspectedTabs() {
+  const result = await chrome.storage.session.get('inspectedTabs');
+  return result.inspectedTabs || {};
+}
 
-// tabId -> buffered data
-var data = {};
+async function setInspectedTabs(tabs) {
+  await chrome.storage.session.set({ inspectedTabs: tabs });
+}
 
-function brokerMessage(message, sender) {
-  var tabId = sender.tab.id,
-      devToolsPort = inspectedTabs[tabId];
+async function getData(tabId) {
+  const result = await chrome.storage.session.get(`data_${tabId}`);
+  return result[`data_${tabId}`] || { hints: [], scopes: {} };
+}
 
-  if (!data[tabId] || message === 'refresh') {
-    resetState(tabId);
+async function setData(tabId, data) {
+  await chrome.storage.session.set({ [`data_${tabId}`]: data });
+}
+
+async function removeData(tabId) {
+  await chrome.storage.session.remove(`data_${tabId}`);
+}
+
+async function brokerMessage(message, sender) {
+  var tabId = sender.tab.id;
+  const inspectedTabs = await getInspectedTabs();
+  const devToolsPort = inspectedTabs[tabId];
+  const tabData = await getData(tabId);
+
+  if (!tabData.hints || !tabData.scopes || message === 'refresh') {
+    await resetState(tabId);
 
     // TODO: this is kind of a hack-y spot to put this
     showPageAction(tabId);
@@ -18,7 +37,7 @@ function brokerMessage(message, sender) {
 
   if (message !== 'refresh') {
     transformMessage(tabId, message);
-    bufferData(tabId, message);
+    await bufferData(tabId, message);
   }
 
   if (devToolsPort) {
@@ -26,11 +45,11 @@ function brokerMessage(message, sender) {
   }
 }
 
-function resetState(tabId) {
-  data[tabId] = {
+async function resetState(tabId) {
+  await setData(tabId, {
     hints: [],
     scopes: {}
-  };
+  });
 }
 
 function transformMessage(tabId, message) {
@@ -63,9 +82,9 @@ function getSubTree(scopes, id){
   return subTree;
 }
 
-function bufferData(tabId, message) {
-  var tabData = data[tabId],
-      scope;
+async function bufferData(tabId, message) {
+  const tabData = await getData(tabId);
+  var scope;
 
   if (message.isHint) {
     tabData.hints.push(message);
@@ -101,6 +120,9 @@ function bufferData(tabId, message) {
     }
   }
 
+  // Save updated data back to storage
+  await setData(tabId, tabData);
+
   // TODO: Handle digest timings
 }
 
@@ -110,35 +132,39 @@ chrome.runtime.onMessage.addListener(brokerMessage);
 chrome.runtime.onConnect.addListener(function (devToolsPort) {
   devToolsPort.onMessage.addListener(registerInspectedTabId);
 
-  function registerInspectedTabId(inspectedTabId) {
+  async function registerInspectedTabId(inspectedTabId) {
+    const inspectedTabs = await getInspectedTabs();
     inspectedTabs[inspectedTabId] = devToolsPort;
+    await setInspectedTabs(inspectedTabs);
 
-    if (!data[inspectedTabId]) {
-      resetState(inspectedTabId);
+    let tabData = await getData(inspectedTabId);
+    if (!tabData.hints || !tabData.scopes) {
+      await resetState(inspectedTabId);
+      tabData = await getData(inspectedTabId);
     }
     devToolsPort.postMessage({
       event: 'hydrate',
-      data: data[inspectedTabId]
+      data: tabData
     });
 
-    devToolsPort.onDisconnect.addListener(function () {
-      delete inspectedTabs[inspectedTabId];
+    devToolsPort.onDisconnect.addListener(async function () {
+      const tabs = await getInspectedTabs();
+      delete tabs[inspectedTabId];
+      await setInspectedTabs(tabs);
     });
 
     //devToolsPort.onMessage.removeListener(registerInspectedTabId);
   }
 });
 
-chrome.tabs.onRemoved.addListener(function (tabId) {
-  if (data[tabId]) {
-    delete data[tabId];
-  }
+chrome.tabs.onRemoved.addListener(async function (tabId) {
+  await removeData(tabId);
 });
 
 
 function showPageAction(tabId) {
-  chrome.pageAction.show(tabId);
-  chrome.pageAction.setTitle({
+  chrome.action.show(tabId);
+  chrome.action.setTitle({
     tabId: tabId,
     title: 'Batarang Active'
   });
